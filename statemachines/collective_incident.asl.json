@@ -1,0 +1,91 @@
+{
+  "Comment": "Incidente colectivo: IA resume y prioriza, se registra y se notifica al NOC",
+  "StartAt": "AnalizarConIA",
+  "States": {
+    "AnalizarConIA": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${SummarizeZoneArn}",
+        "Payload": {
+          "zone.$": "$.detail.zone",
+          "count.$": "$.detail.count"
+        }
+      },
+      "ResultSelector": {
+        "resumen.$": "$.Payload.resumen",
+        "causa.$": "$.Payload.causa_probable",
+        "accion.$": "$.Payload.accion_recomendada",
+        "prioridad.$": "$.Payload.prioridad",
+        "mensaje.$": "$.Payload.mensaje_usuarios"
+      },
+      "ResultPath": "$.ai",
+      "Retry": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "IntervalSeconds": 2,
+          "MaxAttempts": 2,
+          "BackoffRate": 2
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "ResultPath": "$.aiError",
+          "Next": "IASinRespuesta"
+        }
+      ],
+      "Next": "CrearIncidenteColectivo"
+    },
+    "IASinRespuesta": {
+      "Type": "Pass",
+      "Result": {
+        "resumen": "IA no disponible",
+        "causa": "Por determinar",
+        "accion": "Verificar infraestructura de la zona",
+        "prioridad": 3,
+        "mensaje": "Detectamos una incidencia en tu zona y ya la estamos evaluando."
+      },
+      "ResultPath": "$.ai",
+      "Next": "CrearIncidenteColectivo"
+    },
+    "CrearIncidenteColectivo": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::dynamodb:putItem",
+      "Parameters": {
+        "TableName": "${IncidentsTable}",
+        "Item": {
+          "pk": { "S.$": "States.Format('INC#COL-{}', $$.Execution.Name)" },
+          "sk": { "S": "META" },
+          "incidentId": { "S.$": "States.Format('COL-{}', $$.Execution.Name)" },
+          "type": { "S": "COLLECTIVE" },
+          "status": { "S": "EN_REVISION" },
+          "zone": { "S.$": "$.detail.zone" },
+          "affectedUsers": { "N.$": "States.Format('{}', $.detail.count)" },
+          "priority": { "N.$": "States.Format('{}', $.ai.prioridad)" },
+          "aiSummary": { "S.$": "$.ai.resumen" },
+          "aiCause": { "S.$": "$.ai.causa" },
+          "aiAction": { "S.$": "$.ai.accion" },
+          "userMessage": { "S.$": "$.ai.mensaje" },
+          "createdAt": { "S.$": "$$.State.EnteredTime" },
+          "gsi1pk": { "S": "STATUS#EN_REVISION" },
+          "gsi1sk": { "S.$": "$$.State.EnteredTime" },
+          "gsi3pk": { "S.$": "States.Format('ZONE#{}', $.detail.zone)" },
+          "gsi3sk": { "S.$": "$$.State.EnteredTime" }
+        }
+      },
+      "ResultPath": null,
+      "Next": "NotificarNOC"
+    },
+    "NotificarNOC": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::sns:publish",
+      "Parameters": {
+        "TopicArn": "${AlertsTopic}",
+        "Subject": "TeleCorp: incidente colectivo detectado",
+        "Message.$": "States.Format('Zona {} | {} usuarios afectados | Prioridad {}/5\n\nResumen: {}\nCausa probable: {}\nAccion recomendada: {}', $.detail.zone, $.detail.count, $.ai.prioridad, $.ai.resumen, $.ai.causa, $.ai.accion)"
+      },
+      "End": true
+    }
+  }
+}

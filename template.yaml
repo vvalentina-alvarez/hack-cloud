@@ -1,0 +1,346 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: Red TeleCorp - plataforma serverless multinube de incidencias (AWS Learner Lab)
+
+Parameters:
+  LabRoleArn:
+    Type: String
+    Description: ARN del LabRole (arn:aws:iam::<cuenta>:role/LabRole)
+  AlertEmail:
+    Type: String
+    Description: Email del NOC para recibir alertas
+  LlmProvider:
+    Type: String
+    Default: bedrock
+    AllowedValues: [bedrock, vertex]
+    Description: Donde corre Claude (bedrock = AWS, vertex = GCP)
+  BedrockModelId:
+    Type: String
+    Default: anthropic.claude-opus-5-5
+  VertexModelId:
+    Type: String
+    Default: claude-opus-5-5
+  VertexRegion:
+    Type: String
+    Default: global
+
+Globals:
+  Function:
+    Runtime: python3.13
+    Architectures: [x86_64]
+    CodeUri: src/
+    Timeout: 15
+    MemorySize: 256
+    Environment:
+      Variables:
+        INCIDENTS_TABLE: !Ref IncidentsTable
+        ANTENNAS_TABLE: !Ref AntennasTable
+        ZONE_TABLE: !Ref ZoneWindowTable
+        CHAT_TABLE: !Ref ChatTable
+        EVENT_BUS: !Ref EventBus
+        CONFIG_SECRET_ARN: !Ref ConfigSecret
+        CLOUD_CREDS_SECRET: telecorp/cloud-creds
+        REPORTS_QUEUE_URL: !Ref ReportsQueue
+        ANTENNA_QUEUE_URL: !Ref AntennaMetricsQueue
+        UPLOADS_BUCKET: !Sub ${AWS::StackName}-uploads-${AWS::AccountId}
+        LLM_PROVIDER: !Ref LlmProvider
+        BEDROCK_MODEL_ID: !Ref BedrockModelId
+        VERTEX_MODEL_ID: !Ref VertexModelId
+        VERTEX_REGION: !Ref VertexRegion
+
+#datos
+Resources:
+  IncidentsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+        - { AttributeName: gsi1pk, AttributeType: S }
+        - { AttributeName: gsi1sk, AttributeType: S }
+        - { AttributeName: gsi2pk, AttributeType: S }
+        - { AttributeName: gsi2sk, AttributeType: S }
+        - { AttributeName: gsi3pk, AttributeType: S }
+        - { AttributeName: gsi3sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      GlobalSecondaryIndexes:
+        - IndexName: byStatus
+          KeySchema:
+            - { AttributeName: gsi1pk, KeyType: HASH }
+            - { AttributeName: gsi1sk, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: byUser
+          KeySchema:
+            - { AttributeName: gsi2pk, KeyType: HASH }
+            - { AttributeName: gsi2sk, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+        - IndexName: byZone
+          KeySchema:
+            - { AttributeName: gsi3pk, KeyType: HASH }
+            - { AttributeName: gsi3sk, KeyType: RANGE }
+          Projection: { ProjectionType: ALL }
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+      StreamSpecification: { StreamViewType: NEW_AND_OLD_IMAGES }
+
+  AntennasTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: antennaId, AttributeType: S }]
+      KeySchema: [{ AttributeName: antennaId, KeyType: HASH }]
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+
+  ZoneWindowTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: pk, AttributeType: S }
+        - { AttributeName: sk, AttributeType: S }
+      KeySchema:
+        - { AttributeName: pk, KeyType: HASH }
+        - { AttributeName: sk, KeyType: RANGE }
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
+
+  ChatTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions: [{ AttributeName: sessionId, AttributeType: S }]
+      KeySchema: [{ AttributeName: sessionId, KeyType: HASH }]
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
+
+  UploadsBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketName: !Sub ${AWS::StackName}-uploads-${AWS::AccountId}
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      CorsConfiguration:
+        CorsRules:
+          - { AllowedMethods: [PUT], AllowedOrigins: ["*"], AllowedHeaders: ["*"] }
+
+  ConfigSecret:
+    Type: AWS::SecretsManager::Secret
+    Properties:
+      Description: Variables globales de TeleCorp
+      SecretString: '{"zone_threshold": 10, "zone_window_hours": 24}'
+
+#colas
+  ReportsDLQ:
+    Type: AWS::SQS::Queue
+  ReportsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 90
+      RedrivePolicy: { deadLetterTargetArn: !GetAtt ReportsDLQ.Arn, maxReceiveCount: 3 }
+  AntennaDLQ:
+    Type: AWS::SQS::Queue
+  AntennaMetricsQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      VisibilityTimeout: 90
+      RedrivePolicy: { deadLetterTargetArn: !GetAtt AntennaDLQ.Arn, maxReceiveCount: 3 }
+
+#eventos
+  EventBus:
+    Type: AWS::Events::EventBus
+    Properties: { Name: !Sub '${AWS::StackName}-bus' }
+
+  AlertsTopic:
+    Type: AWS::SNS::Topic
+    Properties:
+      Subscription: [{ Protocol: email, Endpoint: !Ref AlertEmail }]
+
+#api
+  HttpApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      CorsConfiguration:
+        AllowOrigins: ["*"]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowHeaders: [content-type, authorization]
+
+  CreateReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: api.create_report.handler
+      Role: !Ref LabRoleArn
+      Events:
+        Post:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /reports, Method: POST }
+
+  ApiFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: api.router.handler
+      Role: !Ref LabRoleArn
+      Events:
+        ListIncidents:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /incidents, Method: GET }
+        GetIncident:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: "/incidents/{id}", Method: GET }
+        ChangeStatus:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: "/incidents/{id}/status", Method: PATCH }
+        ImageUrl:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: "/incidents/{id}/image-url", Method: POST }
+        UserIncidents:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: "/users/{userId}/incidents", Method: GET }
+        ListAntennas:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /antennas, Method: GET }
+
+  ChatFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ai.chat.handler
+      Role: !Ref LabRoleArn
+      Timeout: 29
+      MemorySize: 512
+      Events:
+        Chat:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /chat, Method: POST }
+
+  ProcessReportFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: workers.process_report.handler
+      Role: !Ref LabRoleArn
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ReportsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+            ScalingConfig: { MaximumConcurrency: 2 }
+
+  AntennaSimulatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: antennas.simulator.handler
+      Role: !Ref LabRoleArn
+      Events:
+        EveryMinute:
+          Type: Schedule
+          Properties:
+            Schedule: rate(1 minute)
+            Enabled: true            #cambia a false y redespliega cuando no probando
+
+  AntennaEvaluatorFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: antennas.evaluator.handler
+      Role: !Ref LabRoleArn
+      Events:
+        Queue:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt AntennaMetricsQueue.Arn
+            BatchSize: 10
+            FunctionResponseTypes: [ReportBatchItemFailures]
+            ScalingConfig: { MaximumConcurrency: 2 }
+
+#ia
+  SummarizeZoneFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ai.summarize_zone.handler
+      Role: !Ref LabRoleArn
+      Timeout: 60
+      MemorySize: 512
+
+  ImageAnalyzerFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: ai.analyze_image.handler
+      Role: !Ref LabRoleArn
+      Timeout: 30
+      Events:
+        Upload:
+          Type: S3
+          Properties:
+            Bucket: !Ref UploadsBucket
+            Events: s3:ObjectCreated:*
+            Filter: { S3Key: { Rules: [{ Name: prefix, Value: incidents/ }] } }
+
+#step functions
+  CollectiveIncidentStateMachine:
+    Type: AWS::Serverless::StateMachine
+    Properties:
+      Role: !Ref LabRoleArn
+      DefinitionUri: statemachines/collective_incident.asl.json
+      DefinitionSubstitutions:
+        IncidentsTable: !Ref IncidentsTable
+        AlertsTopic: !Ref AlertsTopic
+        SummarizeZoneArn: !GetAtt SummarizeZoneFunction.Arn
+
+  ZoneThresholdRule:
+    Type: AWS::Events::Rule
+    Properties:
+      EventBusName: !Ref EventBus
+      EventPattern:
+        source: [telecorp.reports]
+        detail-type: [ZoneThresholdReached]
+      Targets:
+        - Id: CollectiveIncidentSfn
+          Arn: !Ref CollectiveIncidentStateMachine
+          RoleArn: !Ref LabRoleArn
+
+#multinube
+  GcpExporterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: exporters/gcp/
+      Handler: handler.handler
+      Role: !Ref LabRoleArn
+      Timeout: 60
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt IncidentsTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 100
+            MaximumRetryAttempts: 3
+            BisectBatchOnFunctionError: true
+
+  AzureExporterFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: exporters/azure/
+      Handler: handler.handler
+      Role: !Ref LabRoleArn
+      Timeout: 60
+      Events:
+        Stream:
+          Type: DynamoDB
+          Properties:
+            Stream: !GetAtt IncidentsTable.StreamArn
+            StartingPosition: LATEST
+            BatchSize: 100
+            MaximumRetryAttempts: 3
+            BisectBatchOnFunctionError: true
+
+Outputs:
+  ApiUrl:
+    Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
+  SimulatorFunctionName:
+    Value: !Ref AntennaSimulatorFunction
+  UploadsBucketName:
+    Value: !Ref UploadsBucket
+  StateMachineArn:
+    Value: !Ref CollectiveIncidentStateMachine
