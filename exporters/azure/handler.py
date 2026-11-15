@@ -27,6 +27,8 @@ def _get_container():
 
         cfg = json.loads(boto3.client("secretsmanager").get_secret_value(
             SecretId=os.environ["CLOUD_CREDS_SECRET"])["SecretString"])
+        if not cfg.get("azure_connection_string"):
+            return None  # Azure aún no configurado (solo GCP en el secreto)
         _container = BlobServiceClient.from_connection_string(
             cfg["azure_connection_string"]).get_container_client(cfg["azure_container"])
     return _container
@@ -40,6 +42,9 @@ def handler(event, context):
             print("Secreto telecorp/cloud-creds aún no creado: se omite el respaldo en Azure")
             return
         raise
+    if container is None:
+        print("Azure aún no configurado en telecorp/cloud-creds: se omite el respaldo")
+        return
 
     rows = []
     for rec in event["Records"]:
