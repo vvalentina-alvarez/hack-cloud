@@ -18,8 +18,8 @@ Esperado: `ANT-003 = INHABILITADA`, `ANT-004 = CAIDA`, incremento de `failCount`
 
 ## Escenario B — incidente colectivo
 
-```bash
-bash scripts/test_zone.sh https://0rzsjdgx26.execute-api.us-east-1.amazonaws.com
+```powershell
+node scripts/test-burst.mjs https://0rzsjdgx26.execute-api.us-east-1.amazonaws.com 10
 ```
 
 Esperado: diez respuestas `202`, una ejecución de Step Functions, un único incidente colectivo para `zona + SIN_INTERNET`, notificaciones in-app para los diez usuarios y aviso al NOC.
@@ -35,7 +35,7 @@ Repetir con `EN_ATENCION`, `SOLUCIONADA` y `CERRADA`. Consultar el detalle para 
 
 ## Escenario D — ráfaga
 
-```bash
+```powershell
 node scripts/test-burst.mjs https://0rzsjdgx26.execute-api.us-east-1.amazonaws.com 50
 ```
 

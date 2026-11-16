@@ -1,6 +1,6 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
-Description: Red TeleCorp - plataforma serverless multinube de incidencias (AWS Learner Lab)
+Description: Red TeleCorp - plataforma serverless de incidencias en AWS Learner Lab
 
 Parameters:
   LabRoleArn:
@@ -13,28 +13,9 @@ Parameters:
     Type: String
     Default: ''
     Description: Identidad verificada en SES para avisos a usuarios (vacio = solo notificacion in-app)
-  LlmProvider:
-    Type: String
-    Default: bedrock
-    AllowedValues: [bedrock, vertex]
-    Description: Donde corre Claude (bedrock = AWS, vertex = GCP)
   BedrockModelId:
     Type: String
     Default: anthropic.claude-3-5-sonnet-20240620-v1:0
-  VertexModelId:
-    Type: String
-    Default: claude-opus-5-5
-  VertexRegion:
-    Type: String
-    Default: global
-  EnableExternalExporters:
-    Type: String
-    Default: 'false'
-    AllowedValues: ['true', 'false']
-    Description: Crea exportadores GCP/Azure solo cuando sus credenciales existen
-
-Conditions:
-  ExternalExportersEnabled: !Equals [!Ref EnableExternalExporters, 'true']
 
 Globals:
   Function:
@@ -54,14 +35,10 @@ Globals:
         ALERTS_TOPIC_ARN: !Ref AlertsTopic
         NOTIFICATION_FROM_EMAIL: !Ref NotificationFromEmail
         CONFIG_SECRET_ARN: !Ref ConfigSecret
-        CLOUD_CREDS_SECRET: telecorp/cloud-creds
         REPORTS_QUEUE_URL: !Ref ReportsQueue
         ANTENNA_QUEUE_URL: !Ref AntennaMetricsQueue
         UPLOADS_BUCKET: !Sub ${AWS::StackName}-uploads-${AWS::AccountId}
-        LLM_PROVIDER: !Ref LlmProvider
         BEDROCK_MODEL_ID: !Ref BedrockModelId
-        VERTEX_MODEL_ID: !Ref VertexModelId
-        VERTEX_REGION: !Ref VertexRegion
 
 #datos
 Resources:
@@ -356,43 +333,6 @@ Resources:
         - Id: CollectiveIncidentSfn
           Arn: !Ref CollectiveIncidentStateMachine
           RoleArn: !Ref LabRoleArn
-
-#multinube
-  GcpExporterFunction:
-    Type: AWS::Serverless::Function
-    Condition: ExternalExportersEnabled
-    Properties:
-      CodeUri: exporters/gcp/
-      Handler: handler.handler
-      Role: !Ref LabRoleArn
-      Timeout: 60
-      Events:
-        Stream:
-          Type: DynamoDB
-          Properties:
-            Stream: !GetAtt IncidentsTable.StreamArn
-            StartingPosition: LATEST
-            BatchSize: 100
-            MaximumRetryAttempts: 3
-            BisectBatchOnFunctionError: true
-
-  AzureExporterFunction:
-    Type: AWS::Serverless::Function
-    Condition: ExternalExportersEnabled
-    Properties:
-      CodeUri: exporters/azure/
-      Handler: handler.handler
-      Role: !Ref LabRoleArn
-      Timeout: 60
-      Events:
-        Stream:
-          Type: DynamoDB
-          Properties:
-            Stream: !GetAtt IncidentsTable.StreamArn
-            StartingPosition: LATEST
-            BatchSize: 100
-            MaximumRetryAttempts: 3
-            BisectBatchOnFunctionError: true
 
 #frontend estatico privado servido por CloudFront
   FrontendBucket:

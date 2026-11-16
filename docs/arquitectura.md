@@ -30,7 +30,6 @@ flowchart LR
   ROUTER --> NT
   UP[S3 evidencias] --> REKO[Lambda / Rekognition]
   REKO --> DDB
-  DDB -. integración preparada .-> AZ[Azure Blob pendiente]
 ```
 
 ## Flujos evaluables
@@ -47,4 +46,4 @@ flowchart LR
 - SQS desacopla la ingesta y sus DLQ conservan los mensajes no procesables.
 - Los secretos se obtienen en tiempo de ejecución desde Secrets Manager.
 - `MaximumConcurrency: 2` protege la cuota de Learner Lab; en producción se eleva según métricas de cola.
-- Azure está representado solo como integración preparada. No se afirma que esté operativo sin una cuenta configurada.
+- El requisito Azure se declara como no implementado y no se incluye código externo sin despliegue verificable.

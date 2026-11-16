@@ -16,7 +16,7 @@ Mostrar `/antennas` y una ejecución del simulador con una antena forzada.
 
 “Cada reporte se agrupa por geohash, tipo de problema y usuario. Diez usuarios distintos en menos de 24 horas activan una única ejecución. Step Functions hace visible cada etapa: analizar con IA, aplicar fallback, crear el incidente y notificar.”
 
-Ejecutar `scripts/test_zone.sh` y abrir el historial de Step Functions.
+Ejecutar `node scripts/test-burst.mjs <ApiUrl> 10` y abrir el historial de Step Functions.
 
 ## 2:35–3:25 · IA con propósito
 

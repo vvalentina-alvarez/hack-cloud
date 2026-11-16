@@ -11,7 +11,7 @@ Plataforma desplegada en AWS para recibir telemetría de antenas y reportes de u
 - Step Functions para verificar incidentes colectivos, aplicar IA, persistir y notificar.
 - Bedrock/Rekognition para resumen, prioridad, chatbot y evidencias fotográficas.
 - S3 + CloudFront para el portal web.
-- Exportador preparado para Azure Blob; requiere credenciales Azure y no se considera operativo en la demo actual.
+- El alcance entregado es AWS; el requisito multinube con Azure queda declarado como no implementado.
 
 El diagrama y las decisiones están en [docs/arquitectura.md](docs/arquitectura.md).
 
@@ -58,7 +58,7 @@ python -m unittest discover -s tests -v
 node scripts/test-burst.mjs https://0rzsjdgx26.execute-api.us-east-1.amazonaws.com 50
 ```
 
-También existen `scripts/test_zone.sh` y `scripts/test_chat.sh`. La guía completa de demo está en [docs/demo.md](docs/demo.md).
+La guía completa de demo está en [docs/demo.md](docs/demo.md).
 
 ## Seguridad
 
