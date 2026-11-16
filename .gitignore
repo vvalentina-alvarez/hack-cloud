@@ -5,3 +5,4 @@ __pycache__/
 creds.json
 gcp-key.json
 samconfig.toml
+test-results/

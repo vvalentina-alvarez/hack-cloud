@@ -8,15 +8,15 @@ _client = None
 
 
 def get_client():
-    #Claude vía Amazon Bedrock (AWS) o vía Vertex AI (GCP), según LLM_PROVIDER
+    # Claude via Amazon Bedrock (AWS) o Vertex AI, segun LLM_PROVIDER.
     global _client
     if _client is not None:
         return _client
 
     if PROVIDER == "bedrock":
-        from anthropic import AnthropicBedrockMantle
+        from anthropic import AnthropicBedrock
 
-        _client = AnthropicBedrockMantle(aws_region=os.environ["AWS_REGION"])
+        _client = AnthropicBedrock(aws_region=os.environ["AWS_REGION"])
     else:
         from anthropic import AnthropicVertex
         from google.oauth2 import service_account

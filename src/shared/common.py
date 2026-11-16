@@ -14,14 +14,17 @@ _secrets = boto3.client("secretsmanager")
 incidents_table = dynamodb.Table(os.environ["INCIDENTS_TABLE"])
 antennas_table = dynamodb.Table(os.environ["ANTENNAS_TABLE"])
 zone_table = dynamodb.Table(os.environ["ZONE_TABLE"])
+notifications_table = dynamodb.Table(os.environ["NOTIFICATIONS_TABLE"])
 
 GEOHASH_PRECISION = 6  #1.2 km x 0.6 km por zona
 
 TRANSITIONS = {
     "REGISTRADA": {"EN_REVISION"},
-    "EN_REVISION": {"ATENDIDA", "CERRADA"},
+    "EN_REVISION": {"EN_ATENCION", "CERRADA"},
+    "EN_ATENCION": {"SOLUCIONADA"},
+    # Compatibilidad con incidencias creadas antes de adoptar el nombre del requisito.
     "ATENDIDA": {"SOLUCIONADA"},
-    "SOLUCIONADA": {"CERRADA", "ATENDIDA"},
+    "SOLUCIONADA": {"CERRADA", "EN_ATENCION"},
     "CERRADA": set(),
 }
 

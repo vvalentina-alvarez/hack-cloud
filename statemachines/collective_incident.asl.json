@@ -9,6 +9,7 @@
         "FunctionName": "${SummarizeZoneArn}",
         "Payload": {
           "zone.$": "$.detail.zone",
+          "problemType.$": "$.detail.problemType",
           "count.$": "$.detail.count"
         }
       },
@@ -61,6 +62,7 @@
           "type": { "S": "COLLECTIVE" },
           "status": { "S": "EN_REVISION" },
           "zone": { "S.$": "$.detail.zone" },
+          "problemType": { "S.$": "$.detail.problemType" },
           "affectedUsers": { "N.$": "States.Format('{}', $.detail.count)" },
           "priority": { "N.$": "States.Format('{}', $.ai.prioridad)" },
           "aiSummary": { "S.$": "$.ai.resumen" },
@@ -75,6 +77,24 @@
         }
       },
       "ResultPath": null,
+      "Next": "NotificarUsuarios"
+    },
+    "NotificarUsuarios": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::lambda:invoke",
+      "Parameters": {
+        "FunctionName": "${NotifyUsersArn}",
+        "Payload": {
+          "mode": "zone",
+          "zone.$": "$.detail.zone",
+          "problemType.$": "$.detail.problemType",
+          "status": "EN_REVISION",
+          "message.$": "$.ai.mensaje"
+        }
+      },
+      "ResultPath": null,
+      "Retry": [{"ErrorEquals": ["States.ALL"], "IntervalSeconds": 2, "MaxAttempts": 2}],
+      "Catch": [{"ErrorEquals": ["States.ALL"], "ResultPath": null, "Next": "NotificarNOC"}],
       "Next": "NotificarNOC"
     },
     "NotificarNOC": {

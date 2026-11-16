@@ -108,11 +108,11 @@ E_SFN_D = E_SFN + "dashed=1;"
 
 # ---------------------------------------------------------------- fila superior
 users = vertex("<b>Usuarios</b><br>Clientes (web / celular) · Operadores NOC", 10, 20, 190, 55, BOX)
-vertex("<b>Amplify Hosting</b> · React + Vite (SPA) · portal de reportes, chat y mapa NOC",
+vertex("<b>CloudFront + S3</b> · SPA HTML/CSS/JS · portal de reportes, chat y panel NOC",
        215, 0, 330, 18, TXT_C)
 amplify = vertex("", 300, 22, 48, 48, I_AMPLIFY)
 git = vertex("<b>Repositorio Git</b><br>template.yaml (AWS SAM) · src/ · frontend/", 620, 22, 220, 50, BOX)
-cfn = vertex("<b>CloudFormation</b> (vía AWS SAM)<br>1 stack: telecorp-dev · sam build &amp;&amp; sam deploy<br>"
+cfn = vertex("<b>CloudFormation</b> (vía AWS SAM)<br>1 stack: red-telecorp · sam build &amp;&amp; sam deploy<br>"
              "Learner Lab · us-east-1", 900, 15, 330, 60,
              "rounded=1;whiteSpace=wrap;html=1;fillColor=#DAE8FC;strokeColor=#6C8EBF;strokeWidth=2;fontSize=9;arcSize=10;")
 vertex("<b>Externo</b> (desde el navegador)<br>OpenStreetMap: mapa de antenas e incidentes (Leaflet)<br>"
@@ -164,7 +164,7 @@ lam(0, "<b>urlImagen</b><br>POST /incidents/{id}/image-url (5 min)", L_API, 4)
 lam(0, "<b>misIncidencias</b><br>GET /users/{userId}/incidents", L_API, 5)
 lam(0, "<b>listarAntenas</b><br>GET /antennas (lee t_antenas)", L_API, 6)
 vertex("rutas GET/PATCH/image-url: 1 Lambda router (ApiFunction)<br>estados: REGISTRADA → EN_REVISION → "
-       "ATENDIDA → SOLUCIONADA → CERRADA (historial EVENT#)", 15, 523, 220, 62, NOTE)
+       "EN_ATENCION → SOLUCIONADA → CERRADA (historial EVENT#)", 15, 523, 220, 62, NOTE)
 t_inc = table(0, "<b>t_incidencias</b> (tabla central)<br>PK=INC#id · SK=META | EVENT#ts<br>"
                  "GSI byStatus · byUser · byZone<br>Streams ON · PITR")
 edge(None, t_inc, "R/W", E_RW, sp=(125, 592))
@@ -200,7 +200,7 @@ c4 = column(3, "M4 · Asistente IA (chatbot)")
 header(3, I_APIGW, "<b>API Gateway</b> · POST /chat<br>(misma api-telecorp)<br>timeout 29 s")
 chat = lam(3, "<b>chat</b><br>POST /chat · bucle de herramientas (máx. 5)", L_API, 0)
 bedrock = vertex("", 782, 332, 44, 44, I_BEDROCK)
-bedrock_txt = vertex("<b>Amazon Bedrock</b> · Claude<br>anthropic.claude-opus-5-5<br>"
+bedrock_txt = vertex("<b>Amazon Bedrock</b> · Claude<br>modelo configurable por parámetro SAM<br>"
                      "alternativa: Vertex AI (LLM_PROVIDER)", 832, 326, 172, 56, TXT)
 vertex("<b>Herramientas (tool use)</b><br>registrar_incidencia → misma validación de POST /reports → SQS<br>"
        "consultar_incidencia → t_incidencias<br>listar_mis_incidencias → GSI byUser", 780, 400, 220, 78, NOTE)
@@ -210,7 +210,7 @@ edge(None, t_chat, "R/W", E_RW, sp=(890, 490))
 
 # ---- M5 Evidencias
 c5 = column(4, "M5 · Evidencias (fotos)")
-s3 = header(4, I_S3, "<b>S3</b> · telecorp-dev-uploads<br>privado · CORS PUT<br>subida directa desde el navegador")
+s3 = header(4, I_S3, "<b>S3</b> · red-telecorp-uploads<br>privado · CORS PUT<br>subida directa desde el navegador")
 analizar = lam(4, "<b>analizarImagen</b><br>S3 ObjectCreated · prefijo incidents/", L_TRIG, 0)
 reko = vertex("", 1037, 332, 44, 44, I_REKO)
 vertex("<b>Amazon Rekognition</b><br>DetectModerationLabels · DetectLabels · DetectText", 1087, 326, 172, 56, TXT)
@@ -246,7 +246,7 @@ header(6, I_DDB, "<b>DynamoDB Streams</b> · t_incidencias<br>NEW_AND_OLD_IMAGES
 exp_gcp = lam(6, "<b>exportarGCP</b><br>Stream → Pub/Sub (REST + service account)", L_TRIG, 0)
 exp_az = lam(6, "<b>exportarAzure</b><br>Stream → Blob .jsonl por lote (idempotente)", L_TRIG, 1)
 vertex("credenciales en Secrets Manager (telecorp/cloud-creds)<br>si el secreto aún no existe → omite sin fallar"
-       "<br><b>AWS procesa · GCP analiza · Azure respalda</b>", 1545, 365, 220, 64, NOTE)
+       "<br><b>AWS operativo · exportadores externos pendientes</b>", 1545, 365, 220, 64, NOTE)
 
 # ---------------------------------------------------------------- nubes externas
 vertex("Google Cloud · analítica histórica", 1800, 200, 310, 380,
@@ -265,7 +265,7 @@ vertex("service account <b>aws-publisher</b><br>roles: pubsub.publisher (+ aipla
 edge(pubsub, bq, "suscripción", E_GCP)
 edge(bq, looker, "", E_GCP)
 
-vertex("Microsoft Azure · respaldo / DR", 1800, 600, 310, 210,
+vertex("Microsoft Azure · integración pendiente (no desplegada)", 1800, 600, 310, 210,
        "rounded=1;arcSize=3;whiteSpace=wrap;html=1;fillColor=#EEF6FD;strokeColor=#0078D4;strokeWidth=2;"
        "verticalAlign=top;fontStyle=1;fontSize=13;spacingTop=4;")
 blob = vertex("", 1815, 648, 48, 38, I_AZ_BLOB)
@@ -281,16 +281,16 @@ edge(exp_az, blob, "HTTPS", E_AZ, pts=[(1790, 334), (1790, 667)])
 qrep = vertex("", 330, 905, 44, 44, I_SQS)
 vertex("<b>q-reportes</b><br>API + chatbot", 300, 951, 104, 30, TXT_C)
 dlq1 = vertex("", 440, 905, 44, 44, I_SQS)
-vertex("<b>DLQ</b> · 3 intentos<br>retención 14 días", 410, 951, 104, 30, TXT_C)
+vertex("<b>DLQ</b> · 3 intentos<br>retención 4 días", 410, 951, 104, 30, TXT_C)
 qant = vertex("", 585, 905, 44, 44, I_SQS)
 vertex("<b>q-antenas</b><br>métricas cada minuto", 555, 951, 104, 30, TXT_C)
 dlq2 = vertex("", 695, 905, 44, 44, I_SQS)
-vertex("<b>DLQ</b> · 3 intentos<br>retención 14 días", 665, 951, 104, 30, TXT_C)
+vertex("<b>DLQ</b> · 3 intentos<br>retención 4 días", 665, 951, 104, 30, TXT_C)
 edge(qrep, dlq1, "redrive", E_EVT)
 edge(qant, dlq2, "redrive", E_EVT)
 
 bus = vertex("", 1100, 905, 48, 48, I_EB)
-vertex("<b>EventBridge</b> · bus telecorp-dev-bus<br>ZoneThresholdReached · AntennaStateChanged<br>"
+vertex("<b>EventBridge</b> · bus del stack red-telecorp<br>ZoneThresholdReached · AntennaStateChanged<br>"
        "IncidentStatusChanged · PhysicalDamageDetected", 1155, 900, 220, 58, TXT)
 sns = vertex("", 1400, 990, 44, 44, I_SNS)
 vertex("<b>SNS</b> · alertas<br>suscripción email", 1372, 1036, 100, 30, TXT_C)
@@ -356,7 +356,7 @@ vertex("<b>Leyenda</b><br>"
        "── negro: HTTPS del navegador · ── azul: lectura/escritura DynamoDB · ┄ azul: invocación directa "
        "(Lambda o modelo de IA) · ── rosado: mensaje o evento (SQS, EventBridge, SNS, Streams)<br>"
        "── verde: subida directa a S3 · ── azul claro: exportación a GCP / Azure<br>"
-       "<b>3 nubes:</b> AWS (núcleo + IA) · Google Cloud (analítica) · Azure (respaldo)",
+       "<b>Estado real:</b> AWS operativo · GCP y Azure preparados pero no desplegados",
        650, 1080, 800, 80,
        "rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#666666;fontSize=9;arcSize=6;"
        "align=left;spacingLeft=8;")

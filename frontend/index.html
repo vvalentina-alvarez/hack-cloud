@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Portal de incidencias de Red TeleCorp" />
+    <title>Red TeleCorp | Centro de servicio</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" aria-label="Navegación principal">
+        <a class="brand" href="#" aria-label="Red TeleCorp, inicio">
+          <span class="brand-mark" aria-hidden="true">
+            <i></i><i></i><i></i>
+          </span>
+          <span>Red <strong>TeleCorp</strong></span>
+        </a>
+
+        <nav class="nav-list">
+          <button class="nav-item active" data-view="inicio">
+            <span class="nav-icon">⌂</span><span>Inicio</span>
+          </button>
+          <button class="nav-item" data-view="reportar">
+            <span class="nav-icon">＋</span><span>Reportar problema</span>
+          </button>
+          <button class="nav-item" data-view="incidencias">
+            <span class="nav-icon">≡</span><span>Mis incidencias</span>
+            <span class="nav-count">2</span>
+          </button>
+          <button class="nav-item" data-view="soporte">
+            <span class="nav-icon">✦</span><span>Asistente IA</span>
+          </button>
+        </nav>
+
+        <div class="sidebar-foot">
+          <div class="help-card">
+            <span class="help-icon">?</span>
+            <p><strong>¿Necesitas ayuda?</strong><br />Estamos disponibles 24/7.</p>
+            <button data-view="soporte">Hablar con soporte</button>
+          </div>
+          <button class="profile-mini">
+            <span class="avatar">AM</span>
+            <span><strong>Alex Medina</strong><small>Plan Fibra 600</small></span>
+            <span>⋮</span>
+          </button>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="menu-button" aria-label="Abrir menú">☰</button>
+          <div class="breadcrumb"><span>Centro de servicio</span><b>/</b><strong id="page-name">Inicio</strong></div>
+          <div class="top-actions">
+            <span class="live-chip"><i></i> Red operativa</span>
+            <button class="icon-button" aria-label="Notificaciones">♢<span class="notification-dot"></span></button>
+          </div>
+        </header>
+
+        <section class="view active" id="inicio">
+          <div class="welcome-row">
+            <div>
+              <p class="eyebrow">DOMINGO, 15 DE NOVIEMBRE</p>
+              <h1>Hola, Alex <span>👋</span></h1>
+              <p>Tu servicio está funcionando con normalidad.</p>
+            </div>
+            <button class="primary-button" data-view="reportar"><span>＋</span> Reportar un problema</button>
+          </div>
+
+          <div class="status-layout">
+            <article class="network-card">
+              <div class="card-heading">
+                <div><span class="section-kicker">ESTADO DEL SERVICIO</span><h2>Todo conectado</h2></div>
+                <span class="status-badge ok">● OPERATIVO</span>
+              </div>
+              <div class="service-grid">
+                <div class="service-metric">
+                  <span class="metric-icon wifi">⌁</span>
+                  <div><small>Internet fibra</small><strong>600 Mbps</strong><span>Velocidad contratada</span></div>
+                </div>
+                <div class="service-metric">
+                  <span class="metric-icon signal">▮</span>
+                  <div><small>Calidad de señal</small><strong id="network-quality">Consultando…</strong><span id="network-update">Conectando con AWS</span></div>
+                </div>
+                <div class="service-metric">
+                  <span class="metric-icon pin">⌖</span>
+                  <div><small>Zona de servicio</small><strong>Miraflores</strong><span>Lima, Perú</span></div>
+                </div>
+              </div>
+              <div class="signal-chart" aria-label="Actividad de red durante el día">
+                <div class="chart-title"><span>Actividad de tu conexión</span><small>Últimas 24 horas</small></div>
+                <svg viewBox="0 0 720 140" role="img" aria-label="Gráfico estable de conexión">
+                  <defs><linearGradient id="area" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#21c985" stop-opacity=".28"/><stop offset="1" stop-color="#21c985" stop-opacity="0"/></linearGradient></defs>
+                  <path class="area" d="M0 104 C45 95 66 91 102 94 S162 67 207 76 S266 93 310 67 S374 48 418 61 S480 82 526 52 S598 35 640 46 S687 28 720 34 L720 140 L0 140 Z" />
+                  <path class="line" d="M0 104 C45 95 66 91 102 94 S162 67 207 76 S266 93 310 67 S374 48 418 61 S480 82 526 52 S598 35 640 46 S687 28 720 34" />
+                </svg>
+                <div class="chart-labels"><span>00:00</span><span>06:00</span><span>12:00</span><span>18:00</span><span>Ahora</span></div>
+              </div>
+            </article>
+
+            <aside class="zone-card">
+              <div class="zone-map">
+                <span class="road r1"></span><span class="road r2"></span><span class="road r3"></span><span class="road r4"></span>
+                <span class="block b1"></span><span class="block b2"></span><span class="block b3"></span><span class="block b4"></span>
+                <span class="map-pin user"><i></i></span>
+                <span class="antenna a1">⌁</span><span class="antenna a2">⌁</span><span class="antenna a3">⌁</span>
+                <div class="coverage-ring"></div>
+              </div>
+              <div class="zone-info">
+                <span class="section-kicker">TU ZONA</span>
+                <h3>Miraflores está estable</h3>
+                <p>No se han detectado interrupciones generales cerca de ti.</p>
+                <div class="zone-stat"><span><i></i> <b id="antenna-count">—</b> antenas monitoreadas</span><strong id="network-availability">— <small>disponibilidad</small></strong></div>
+              </div>
+            </aside>
+          </div>
+
+          <div class="bottom-grid">
+            <section class="incidents-preview">
+              <div class="section-header"><div><span class="section-kicker">SEGUIMIENTO</span><h2>Incidencias recientes</h2></div><button class="text-button" data-view="incidencias">Ver todas →</button></div>
+              <article class="incident-row">
+                <span class="incident-symbol amber">⌁</span>
+                <div class="incident-main"><strong>Conexión intermitente</strong><span>INC-8F2A19 · Reportado el 12 nov.</span></div>
+                <span class="status-badge progress">EN REVISIÓN</span>
+                <div class="progress-line"><i></i></div>
+                <button class="round-button">→</button>
+              </article>
+              <article class="incident-row">
+                <span class="incident-symbol green">✓</span>
+                <div class="incident-main"><strong>Velocidad reducida</strong><span>INC-21D904 · Reportado el 03 nov.</span></div>
+                <span class="status-badge solved">RESUELTA</span>
+                <div class="progress-line complete"><i></i></div>
+                <button class="round-button">→</button>
+              </article>
+            </section>
+
+            <aside class="ai-card">
+              <span class="ai-orb">✦</span>
+              <div><span class="section-kicker">ASISTENTE INTELIGENTE</span><h3>¿Tienes una duda rápida?</h3><p>Consulta el estado de tu servicio o registra una incidencia conversando.</p></div>
+              <button class="dark-button" data-view="soporte">Iniciar conversación <span>→</span></button>
+            </aside>
+          </div>
+          <section class="analytics-card">
+            <div class="section-header"><div><span class="section-kicker">OPERACIONES EN TIEMPO REAL</span><h2>Impacto e historial</h2></div><span class="live-chip"><i></i> Datos AWS</span></div>
+            <div class="analytics-grid">
+              <div><small>Reportes recibidos</small><strong id="metric-reports">—</strong><span>Histórico persistente</span></div>
+              <div><small>Usuarios afectados</small><strong id="metric-users">—</strong><span>Usuarios distintos</span></div>
+              <div><small>Incidentes colectivos</small><strong id="metric-collective">—</strong><span>Correlacionados por zona y tipo</span></div>
+              <div><small>Antena más recurrente</small><strong id="metric-antenna">—</strong><span id="metric-antenna-detail">Sin fallas registradas</span></div>
+            </div>
+          </section>
+        </section>
+
+        <section class="view" id="reportar">
+          <div class="page-intro"><span class="eyebrow">NUEVA SOLICITUD</span><h1>Cuéntanos qué está pasando</h1><p>Completa los datos y nuestro sistema priorizará tu reporte automáticamente.</p></div>
+          <div class="form-layout">
+            <form class="report-form" id="report-form">
+              <div class="form-section"><span class="step-number">1</span><div><h2>Tipo de problema</h2><p>Elige la opción que mejor describa tu situación.</p></div></div>
+              <div class="problem-options">
+                <label><input type="radio" name="problem" value="SIN_INTERNET" checked /><span>⌁</span><strong>Sin internet</strong><small>No puedo navegar</small></label>
+                <label><input type="radio" name="problem" value="SIN_SENAL" /><span>▮</span><strong>Sin señal</strong><small>Sin cobertura móvil</small></label>
+                <label><input type="radio" name="problem" value="LENTITUD" /><span>◷</span><strong>Lentitud</strong><small>Internet muy lento</small></label>
+                <label><input type="radio" name="problem" value="OTRO" /><span>•••</span><strong>Otro</strong><small>Otro inconveniente</small></label>
+              </div>
+              <div class="form-divider"></div>
+              <div class="form-section"><span class="step-number">2</span><div><h2>Detalles del reporte</h2><p>Esto nos ayudará a encontrar una solución más rápido.</p></div></div>
+              <div class="field-grid">
+                <label>Documento<input id="document-id" required value="70000001" /></label>
+                <label>Número de servicio<input id="service-number" required value="01-742-8391" /></label>
+                <label>¿Cuándo comenzó?<input id="occurred-at" type="datetime-local" required /></label>
+                <label>Correo para avisos<input id="contact-email" type="email" placeholder="nombre@correo.com" /></label>
+                <label class="wide">Celular (opcional)<input id="contact-phone" placeholder="+51 999 999 999" /></label>
+                <label class="wide">Descripción<textarea id="report-description" required placeholder="Describe brevemente lo que sucede...">La conexión se corta por momentos desde esta mañana.</textarea><small>Máximo 1000 caracteres</small></label>
+                <button type="button" class="location-button" id="location-button" data-lat="-12.0464" data-lon="-77.0428">⌖ Usar mi ubicación actual <span id="location-label">Miraflores, Lima</span></button>
+              </div>
+              <div class="form-actions"><button type="button" class="secondary-button" data-view="inicio">Cancelar</button><button class="primary-button" type="submit">Enviar reporte <span>→</span></button></div>
+            </form>
+            <aside class="form-aside">
+              <div class="tip-card"><span>✦</span><h3>Resolución inteligente</h3><p>Analizamos reportes cercanos y el estado de las antenas para detectar fallas colectivas.</p></div>
+              <div class="expect-card"><h3>¿Qué pasará después?</h3><ol><li><span>1</span>Validaremos tu información.</li><li><span>2</span>Analizaremos la red de tu zona.</li><li><span>3</span>Te notificaremos cada avance.</li></ol></div>
+            </aside>
+          </div>
+        </section>
+
+        <section class="view" id="incidencias">
+          <div class="page-intro split"><div><span class="eyebrow">HISTORIAL</span><h1>Mis incidencias</h1><p>Consulta el avance de tus solicitudes en tiempo real.</p></div><button class="primary-button" data-view="reportar">＋ Nuevo reporte</button></div>
+          <div class="filter-row"><button class="filter active">Todas <b>2</b></button><button class="filter">En proceso <b>1</b></button><button class="filter">Resueltas <b>1</b></button><label class="search-box">⌕ <input placeholder="Buscar por código o problema" /></label></div>
+          <div class="incident-list" id="incident-list">
+            <article class="incident-detail"><div class="incident-top"><span class="incident-symbol amber">⌁</span><div><span class="incident-code">INC-8F2A19</span><h2>Conexión intermitente</h2><p>La conexión se corta por momentos desde esta mañana.</p></div><span class="status-badge progress">EN REVISIÓN</span></div><div class="timeline"><span class="done"><i>✓</i>Registrada<small>12 nov. · 09:42</small></span><span class="done"><i>✓</i>Validada<small>12 nov. · 09:44</small></span><span class="current"><i></i>En revisión<small>Equipo técnico</small></span><span><i></i>Resuelta<small>Pendiente</small></span></div></article>
+            <article class="incident-detail compact"><div class="incident-top"><span class="incident-symbol green">✓</span><div><span class="incident-code">INC-21D904</span><h2>Velocidad reducida</h2><p>La navegación estaba más lenta de lo habitual.</p></div><span class="status-badge solved">RESUELTA</span></div><div class="resolved-note"><span>✓</span><p><strong>Solucionada el 3 de noviembre</strong>Se optimizó la configuración de la antena asignada a tu zona.</p><button>Ver detalle →</button></div></article>
+          </div>
+          <section class="notifications-panel"><div class="section-header"><div><span class="section-kicker">AVISOS</span><h2>Notificaciones para tu documento</h2></div><button class="text-button" id="refresh-data">Actualizar ↻</button></div><div id="notification-list" class="notification-list"><p class="empty-state">Aún no hay notificaciones.</p></div></section>
+        </section>
+
+        <section class="view" id="soporte">
+          <div class="chat-layout">
+            <div class="chat-copy"><span class="eyebrow">SOPORTE 24/7</span><h1>Resuelve tus dudas<br />con <em>Nova</em></h1><p>Nuestro asistente puede consultar tus incidencias, revisar el estado de tu zona y ayudarte a crear un nuevo reporte.</p><div class="suggestion-list"><button class="chat-suggestion">¿Cómo está mi servicio?</button><button class="chat-suggestion">Consultar INC-8F2A19</button><button class="chat-suggestion">Quiero reportar un problema</button></div></div>
+            <div class="chat-window">
+              <div class="chat-header"><span class="ai-orb small">✦</span><div><strong>Nova</strong><small><i></i> Asistente en línea</small></div><button>•••</button></div>
+              <div class="messages" id="messages"><div class="message assistant"><span class="ai-orb tiny">✦</span><div><p>¡Hola, Alex! Soy Nova, tu asistente de Red TeleCorp.</p><p>¿En qué puedo ayudarte hoy?</p><time>10:24</time></div></div></div>
+              <form class="chat-input" id="chat-form"><button type="button" aria-label="Adjuntar">＋</button><input id="chat-message" autocomplete="off" placeholder="Escribe tu mensaje..." /><button class="send-button" aria-label="Enviar">↑</button></form>
+              <small class="chat-disclaimer">Nova puede cometer errores. Verifica la información importante.</small>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="toast" id="toast" role="status"><span>✓</span><div><strong id="toast-title">Reporte registrado</strong><small id="toast-message">Procesando…</small></div></div>
+    <script src="config.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>

@@ -3,7 +3,7 @@ from datetime import datetime, timedelta, timezone
 
 from boto3.dynamodb.conditions import Attr, Key
 
-from shared.common import antennas_table, dumps, incidents_table
+from shared.common import antennas_table, dumps, get_config, incidents_table
 from shared.llm import get_client, model_id
 
 SYSTEM = """Eres analista del NOC de una empresa de telecomunicaciones. Recibes los reportes de
@@ -25,6 +25,8 @@ DEFAULT = {
 
 def handler(event, context):
     zone, count = event["zone"], event["count"]
+    problem_type = event.get("problemType")
+    cfg = get_config()
     since = (datetime.now(timezone.utc) - timedelta(hours=24)).isoformat()
 
     items = incidents_table.query(
@@ -33,13 +35,17 @@ def handler(event, context):
     )["Items"]
     reports = [{"tipo": i.get("problemType"), "descripcion": i.get("description"),
                 "hora": i.get("occurredAt"), "etiquetas_foto": i.get("imageLabels", [])}
-               for i in items if i.get("type") == "USER_REPORT"][:100]
+               for i in items if i.get("type") == "USER_REPORT"
+               and (not problem_type or i.get("problemType") == problem_type)][:100]
 
     antennas = antennas_table.scan(FilterExpression=Attr("zone").begins_with(zone[:5]))["Items"]
     antennas = [{"id": a["antennaId"], "estado": a.get("state"), "gb_min": a.get("gbPerMin"),
                  "fallas": a.get("failCount", 0)} for a in antennas]
 
-    prompt = (f"Zona (geohash): {zone}\nUsuarios distintos afectados: {count}\n"
+    critical_sites = [site for site in cfg.get("critical_sites", [])
+                      if zone.startswith(site.get("zonePrefix", "__none__"))]
+    prompt = (f"Zona (geohash): {zone}\nTipo correlacionado: {problem_type}\n"
+              f"Usuarios distintos afectados: {count}\nServicios criticos cercanos: {dumps(critical_sites)}\n"
               f"Reportes:\n{dumps(reports)}\nAntenas cercanas:\n{dumps(antennas)}")
 
     resp = get_client().messages.create(
@@ -47,7 +53,6 @@ def handler(event, context):
         max_tokens=4000,
         system=SYSTEM,
         messages=[{"role": "user", "content": prompt}],
-        output_config={"effort": "low"},
     )
     if resp.stop_reason == "refusal":
         return DEFAULT

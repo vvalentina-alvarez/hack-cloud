@@ -9,6 +9,10 @@ Parameters:
   AlertEmail:
     Type: String
     Description: Email del NOC para recibir alertas
+  NotificationFromEmail:
+    Type: String
+    Default: ''
+    Description: Identidad verificada en SES para avisos a usuarios (vacio = solo notificacion in-app)
   LlmProvider:
     Type: String
     Default: bedrock
@@ -16,13 +20,21 @@ Parameters:
     Description: Donde corre Claude (bedrock = AWS, vertex = GCP)
   BedrockModelId:
     Type: String
-    Default: anthropic.claude-opus-5-5
+    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
   VertexModelId:
     Type: String
     Default: claude-opus-5-5
   VertexRegion:
     Type: String
     Default: global
+  EnableExternalExporters:
+    Type: String
+    Default: 'false'
+    AllowedValues: ['true', 'false']
+    Description: Crea exportadores GCP/Azure solo cuando sus credenciales existen
+
+Conditions:
+  ExternalExportersEnabled: !Equals [!Ref EnableExternalExporters, 'true']
 
 Globals:
   Function:
@@ -37,7 +49,10 @@ Globals:
         ANTENNAS_TABLE: !Ref AntennasTable
         ZONE_TABLE: !Ref ZoneWindowTable
         CHAT_TABLE: !Ref ChatTable
+        NOTIFICATIONS_TABLE: !Ref NotificationsTable
         EVENT_BUS: !Ref EventBus
+        ALERTS_TOPIC_ARN: !Ref AlertsTopic
+        NOTIFICATION_FROM_EMAIL: !Ref NotificationFromEmail
         CONFIG_SECRET_ARN: !Ref ConfigSecret
         CLOUD_CREDS_SECRET: telecorp/cloud-creds
         REPORTS_QUEUE_URL: !Ref ReportsQueue
@@ -113,6 +128,19 @@ Resources:
       KeySchema: [{ AttributeName: sessionId, KeyType: HASH }]
       TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
 
+  NotificationsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      BillingMode: PAY_PER_REQUEST
+      AttributeDefinitions:
+        - { AttributeName: userId, AttributeType: S }
+        - { AttributeName: createdAt, AttributeType: S }
+      KeySchema:
+        - { AttributeName: userId, KeyType: HASH }
+        - { AttributeName: createdAt, KeyType: RANGE }
+      TimeToLiveSpecification: { AttributeName: expiresAt, Enabled: true }
+      PointInTimeRecoverySpecification: { PointInTimeRecoveryEnabled: true }
+
   UploadsBucket:
     Type: AWS::S3::Bucket
     Properties:
@@ -130,7 +158,7 @@ Resources:
     Type: AWS::SecretsManager::Secret
     Properties:
       Description: Variables globales de TeleCorp
-      SecretString: '{"zone_threshold": 10, "zone_window_hours": 24}'
+      SecretString: '{"zone_threshold":10,"zone_window_hours":24,"critical_sites":[{"name":"Hospitales y clinicas de Lima Centro","zonePrefix":"6mc5"}]}'
 
 #colas
   ReportsDLQ:
@@ -201,6 +229,12 @@ Resources:
         ListAntennas:
           Type: HttpApi
           Properties: { ApiId: !Ref HttpApi, Path: /antennas, Method: GET }
+        AnalyticsSummary:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /analytics/summary, Method: GET }
+        UserNotifications:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: "/notifications/{userId}", Method: GET }
 
   ChatFunction:
     Type: AWS::Serverless::Function
@@ -277,6 +311,28 @@ Resources:
             Events: s3:ObjectCreated:*
             Filter: { S3Key: { Rules: [{ Name: prefix, Value: incidents/ }] } }
 
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      Handler: notifications.handler.handler
+      Role: !Ref LabRoleArn
+      Timeout: 30
+      Events:
+        StatusChanges:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref EventBus
+            Pattern:
+              source: [telecorp.incidents]
+              detail-type: [IncidentStatusChanged]
+        AntennaChanges:
+          Type: EventBridgeRule
+          Properties:
+            EventBusName: !Ref EventBus
+            Pattern:
+              source: [telecorp.antennas]
+              detail-type: [AntennaStateChanged]
+
 #step functions
   CollectiveIncidentStateMachine:
     Type: AWS::Serverless::StateMachine
@@ -287,6 +343,7 @@ Resources:
         IncidentsTable: !Ref IncidentsTable
         AlertsTopic: !Ref AlertsTopic
         SummarizeZoneArn: !GetAtt SummarizeZoneFunction.Arn
+        NotifyUsersArn: !GetAtt NotificationFunction.Arn
 
   ZoneThresholdRule:
     Type: AWS::Events::Rule
@@ -303,6 +360,7 @@ Resources:
 #multinube
   GcpExporterFunction:
     Type: AWS::Serverless::Function
+    Condition: ExternalExportersEnabled
     Properties:
       CodeUri: exporters/gcp/
       Handler: handler.handler
@@ -320,6 +378,7 @@ Resources:
 
   AzureExporterFunction:
     Type: AWS::Serverless::Function
+    Condition: ExternalExportersEnabled
     Properties:
       CodeUri: exporters/azure/
       Handler: handler.handler
@@ -335,6 +394,70 @@ Resources:
             MaximumRetryAttempts: 3
             BisectBatchOnFunctionError: true
 
+#frontend estatico privado servido por CloudFront
+  FrontendBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
+
+  FrontendOriginAccessControl:
+    Type: AWS::CloudFront::OriginAccessControl
+    Properties:
+      OriginAccessControlConfig:
+        Name: !Sub '${AWS::StackName}-frontend-oac'
+        OriginAccessControlOriginType: s3
+        SigningBehavior: always
+        SigningProtocol: sigv4
+
+  FrontendDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Enabled: true
+        DefaultRootObject: index.html
+        PriceClass: PriceClass_100
+        HttpVersion: http2and3
+        Origins:
+          - Id: FrontendS3Origin
+            DomainName: !GetAtt FrontendBucket.RegionalDomainName
+            OriginAccessControlId: !Ref FrontendOriginAccessControl
+            S3OriginConfig: { OriginAccessIdentity: '' }
+        DefaultCacheBehavior:
+          TargetOriginId: FrontendS3Origin
+          ViewerProtocolPolicy: redirect-to-https
+          AllowedMethods: [GET, HEAD, OPTIONS]
+          CachedMethods: [GET, HEAD, OPTIONS]
+          Compress: true
+          ForwardedValues:
+            QueryString: false
+            Cookies: { Forward: none }
+        CustomErrorResponses:
+          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
+
+  FrontendBucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref FrontendBucket
+      PolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Sid: AllowCloudFrontRead
+            Effect: Allow
+            Principal: { Service: cloudfront.amazonaws.com }
+            Action: s3:GetObject
+            Resource: !Sub '${FrontendBucket.Arn}/*'
+            Condition:
+              StringEquals:
+                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}'
+
 Outputs:
   ApiUrl:
     Value: !Sub https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com
@@ -344,3 +467,9 @@ Outputs:
     Value: !Ref UploadsBucket
   StateMachineArn:
     Value: !Ref CollectiveIncidentStateMachine
+  FrontendBucketName:
+    Value: !Ref FrontendBucket
+  FrontendDistributionId:
+    Value: !Ref FrontendDistribution
+  FrontendUrl:
+    Value: !Sub 'https://${FrontendDistribution.DomainName}'

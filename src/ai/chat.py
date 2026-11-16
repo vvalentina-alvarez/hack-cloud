@@ -26,7 +26,6 @@ TOOLS = [
     {
         "name": "registrar_incidencia",
         "description": "Registra la incidencia del cliente. Úsala solo cuando el cliente haya confirmado los datos.",
-        "strict": True,
         "input_schema": {
             "type": "object",
             "additionalProperties": False,
@@ -48,7 +47,6 @@ TOOLS = [
     {
         "name": "consultar_incidencia",
         "description": "Devuelve el estado actual y el historial de una incidencia por su ID (ej. INC-1a2b3c4d5e).",
-        "strict": True,
         "input_schema": {
             "type": "object",
             "additionalProperties": False,
@@ -59,7 +57,6 @@ TOOLS = [
     {
         "name": "listar_mis_incidencias",
         "description": "Lista las incidencias registradas por un número de documento.",
-        "strict": True,
         "input_schema": {
             "type": "object",
             "additionalProperties": False,
@@ -125,11 +122,10 @@ def handler(event, context):
     for _ in range(5):  # máximo 5 vueltas de herramientas por mensaje
         resp = client.messages.create(
             model=model_id(),
-            max_tokens=16000,
+            max_tokens=4096,
             system=SYSTEM,
             tools=TOOLS,
             messages=messages,
-            output_config={"effort": "low"},  # chat: respuestas rápidas
         )
         if resp.stop_reason == "refusal":
             return response(200, {"sessionId": session_id,

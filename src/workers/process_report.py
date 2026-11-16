@@ -47,21 +47,28 @@ def process(r):
 
     try:
         incidents_table.put_item(Item=item, ConditionExpression="attribute_not_exists(pk)")
-        incidents_table.put_item(Item={
-            "pk": pk, "sk": f"EVENT#{ts}",
-            "status": "REGISTRADA", "note": "Reporte recibido", "at": ts,
-        })
     except ClientError as e:
         if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
             raise
 
-    check_zone(zone, r["userId"], cfg)
+    # La clave del evento es determinista: un reintento completa el historial sin duplicarlo.
+    try:
+        incidents_table.put_item(Item={
+            "pk": pk, "sk": f"EVENT#{ts}",
+            "status": "REGISTRADA", "note": "Reporte recibido", "at": ts,
+        }, ConditionExpression="attribute_not_exists(pk)")
+    except ClientError as e:
+        if e.response["Error"]["Code"] != "ConditionalCheckFailedException":
+            raise
+
+    check_zone(zone, r["userId"], r["problemType"], cfg)
 
 
-def check_zone(zone, user_id, cfg):
+def check_zone(zone, user_id, problem_type, cfg):
     now = int(time.time())
     window = int(cfg["zone_window_hours"]) * 3600
-    zpk = f"ZONE#{zone}"
+    # Solo se correlacionan reportes del mismo tipo en la misma zona.
+    zpk = f"ZONE#{zone}#TYPE#{problem_type}"
 
     #1 item por usuario y zona -> cuenta usuarios DISTINTOS
     zone_table.put_item(Item={"pk": zpk, "sk": f"USER#{user_id}", "expiresAt": now + window})
@@ -88,4 +95,5 @@ def check_zone(zone, user_id, cfg):
         raise
 
     put_event("telecorp.reports", "ZoneThresholdReached",
-              {"zone": zone, "count": count, "detectedAt": now_iso()})
+              {"zone": zone, "problemType": problem_type,
+               "count": count, "detectedAt": now_iso()})

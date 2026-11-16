@@ -1,12 +1,15 @@
 import json
 import os
 import uuid
+from collections import Counter
+from datetime import datetime
 
 import boto3
 from boto3.dynamodb.conditions import Key
 from botocore.exceptions import ClientError
 
-from shared.common import TRANSITIONS, antennas_table, incidents_table, now_iso, put_event, response
+from shared.common import (TRANSITIONS, antennas_table, incidents_table, notifications_table,
+                           now_iso, put_event, response)
 
 s3 = boto3.client("s3")
 
@@ -28,12 +31,24 @@ def handler(event, context):
             return user_incidents(p["userId"])
         if route == "GET /antennas":
             return response(200, {"items": antennas_table.scan()["Items"]})
+        if route == "GET /analytics/summary":
+            return analytics_summary()
+        if route == "GET /notifications/{userId}":
+            return user_notifications(p["userId"])
     except json.JSONDecodeError:
         return response(400, {"error": "JSON inválido"})
     return response(404, {"error": "Ruta no encontrada"})
 
 
 def list_incidents(status):
+    if not status or status.upper() == "ALL":
+        items = incidents_table.scan(
+            FilterExpression="#sk = :meta",
+            ExpressionAttributeNames={"#sk": "sk"},
+            ExpressionAttributeValues={":meta": "META"},
+        )["Items"]
+        items.sort(key=lambda item: item.get("createdAt", ""), reverse=True)
+        return response(200, {"items": items[:50]})
     resp = incidents_table.query(
         IndexName="byStatus",
         KeyConditionExpression=Key("gsi1pk").eq(f"STATUS#{status}"),
@@ -75,12 +90,18 @@ def change_status(inc_id, body):
 
     ts = now_iso()
     try:
+        update = "SET #s = :new, gsi1pk = :g, updatedAt = :ts"
+        values = {":new": new, ":g": f"STATUS#{new}", ":ts": ts, ":old": old}
+        if new == "SOLUCIONADA":
+            update += ", resolvedAt = :ts"
+        if new == "CERRADA":
+            update += ", closedAt = :ts"
         incidents_table.update_item(
             Key=key,
-            UpdateExpression="SET #s = :new, gsi1pk = :g, updatedAt = :ts",
+            UpdateExpression=update,
             ConditionExpression="#s = :old",
             ExpressionAttributeNames={"#s": "status"},
-            ExpressionAttributeValues={":new": new, ":g": f"STATUS#{new}", ":ts": ts, ":old": old},
+            ExpressionAttributeValues=values,
         )
     except ClientError as e:
         if e.response["Error"]["Code"] == "ConditionalCheckFailedException":
@@ -92,6 +113,7 @@ def change_status(inc_id, body):
     })
     put_event("telecorp.incidents", "IncidentStatusChanged", {
         "incidentId": inc_id, "from": old, "to": new, "zone": current.get("zone"),
+        "userId": current.get("userId"), "problemType": current.get("problemType"),
         "email": current.get("email"), "phone": current.get("phone"),
     })
     return response(200, {"incidentId": inc_id, "from": old, "to": new})
@@ -105,3 +127,49 @@ def image_upload_url(inc_id):
         ExpiresIn=300,
     )
     return response(200, {"uploadUrl": url, "key": key})
+
+
+def user_notifications(user_id):
+    result = notifications_table.query(
+        KeyConditionExpression=Key("userId").eq(str(user_id)),
+        ScanIndexForward=False,
+        Limit=50,
+    )
+    return response(200, {"items": result.get("Items", [])})
+
+
+def _hours_between(start, end):
+    try:
+        return round((datetime.fromisoformat(end) - datetime.fromisoformat(start)).total_seconds() / 3600, 2)
+    except (TypeError, ValueError):
+        return None
+
+
+def analytics_summary():
+    items = incidents_table.scan(
+        FilterExpression="#sk = :meta",
+        ExpressionAttributeNames={"#sk": "sk"},
+        ExpressionAttributeValues={":meta": "META"},
+    )["Items"]
+    reports = [item for item in items if item.get("type") == "USER_REPORT"]
+    collective = [item for item in items if item.get("type") == "COLLECTIVE"]
+    durations = [
+        value for value in (_hours_between(item.get("createdAt"), item.get("resolvedAt") or item.get("closedAt"))
+                            for item in items) if value is not None
+    ]
+    antennas = antennas_table.scan()["Items"]
+    recurrent = sorted(
+        ({"antennaId": item["antennaId"], "failCount": int(item.get("failCount", 0)),
+          "state": item.get("state"), "zone": item.get("zone")} for item in antennas),
+        key=lambda item: item["failCount"], reverse=True,
+    )[:5]
+    return response(200, {
+        "totals": {"reports": len(reports), "collectiveIncidents": len(collective),
+                   "affectedUsers": len({item.get("userId") for item in reports if item.get("userId")})},
+        "byStatus": dict(Counter(item.get("status", "DESCONOCIDO") for item in items)),
+        "byProblemType": dict(Counter(item.get("problemType", "OTRO") for item in reports)),
+        "topZones": [{"zone": zone, "count": count}
+                     for zone, count in Counter(item.get("zone") for item in reports if item.get("zone")).most_common(5)],
+        "recurrentAntennas": recurrent,
+        "averageResolutionHours": round(sum(durations) / len(durations), 2) if durations else None,
+    })
