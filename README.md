@@ -10,7 +10,7 @@ Plataforma desplegada en AWS para recibir telemetría de antenas y reportes de u
 - EventBridge para correlación y alertas proactivas.
 - Step Functions para verificar incidentes colectivos, aplicar IA, persistir y notificar.
 - Bedrock/Rekognition para resumen, prioridad, chatbot y evidencias fotográficas.
-- S3 + CloudFront para el portal web.
+- API Gateway + Lambda para publicar el portal dentro de las restricciones de Learner Lab.
 - El alcance entregado es AWS; el requisito multinube con Azure queda declarado como no implementado.
 
 El diagrama y las decisiones están en [docs/arquitectura.md](docs/arquitectura.md).
@@ -64,5 +64,5 @@ La guía completa de demo está en [docs/demo.md](docs/demo.md).
 
 - Nunca guardar claves en el repositorio.
 - Configuración global y credenciales de integraciones en Secrets Manager.
-- S3 de evidencias y frontend privados; CloudFront accede mediante OAC.
+- S3 de evidencias privado y frontend servido por una Lambda sin almacenamiento de credenciales.
 - Para una fase productiva se debe añadir Cognito/WAF y reemplazar `LabRole` por roles mínimos por función.

@@ -2,9 +2,8 @@
 
 ```mermaid
 flowchart LR
-  U[Usuarios / NOC] --> CF[CloudFront]
-  CF --> S3F[S3 frontend privado]
-  CF --> APIGW[API Gateway HTTP]
+  U[Usuarios / NOC] --> APIGW[API Gateway HTTP]
+  APIGW --> WEB[Lambda frontend estático]
   APIGW --> REPORT[Lambda crear reporte]
   APIGW --> ROUTER[Lambda consultas y analítica]
   APIGW --> CHAT[Lambda chatbot IA]

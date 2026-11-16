@@ -32,7 +32,7 @@ Mostrar “Mis incidencias”, notificaciones y el bloque de analítica.
 
 ## 4:10–4:45 · Arquitectura y costo
 
-“No mantenemos servidores. Lambda, DynamoDB on-demand, SQS, EventBridge, Step Functions, S3 y CloudFront escalan por demanda. Pagamos por solicitudes, ejecuciones, almacenamiento y transferencia; las cuotas y concurrencia se pueden controlar.”
+“No mantenemos servidores. Lambda, DynamoDB on-demand, SQS, EventBridge, Step Functions, API Gateway y S3 escalan por demanda. Pagamos por solicitudes, ejecuciones, almacenamiento y transferencia; las cuotas y concurrencia se pueden controlar.”
 
 Mostrar `docs/arquitectura.md`.
 

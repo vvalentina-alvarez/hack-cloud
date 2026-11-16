@@ -15,7 +15,7 @@ Parameters:
     Description: Identidad verificada en SES para avisos a usuarios (vacio = solo notificacion in-app)
   BedrockModelId:
     Type: String
-    Default: anthropic.claude-3-5-sonnet-20240620-v1:0
+    Default: global.anthropic.claude-haiku-5-5
 
 Globals:
   Function:
@@ -334,69 +334,30 @@ Resources:
           Arn: !Ref CollectiveIncidentStateMachine
           RoleArn: !Ref LabRoleArn
 
-#frontend estatico privado servido por CloudFront
-  FrontendBucket:
-    Type: AWS::S3::Bucket
+#frontend estatico servido por API Gateway + Lambda (compatible con Learner Lab)
+  FrontendFunction:
+    Type: AWS::Serverless::Function
     Properties:
-      PublicAccessBlockConfiguration:
-        BlockPublicAcls: true
-        BlockPublicPolicy: true
-        IgnorePublicAcls: true
-        RestrictPublicBuckets: true
-      BucketEncryption:
-        ServerSideEncryptionConfiguration:
-          - ServerSideEncryptionByDefault: { SSEAlgorithm: AES256 }
-
-  FrontendOriginAccessControl:
-    Type: AWS::CloudFront::OriginAccessControl
-    Properties:
-      OriginAccessControlConfig:
-        Name: !Sub '${AWS::StackName}-frontend-oac'
-        OriginAccessControlOriginType: s3
-        SigningBehavior: always
-        SigningProtocol: sigv4
-
-  FrontendDistribution:
-    Type: AWS::CloudFront::Distribution
-    Properties:
-      DistributionConfig:
-        Enabled: true
-        DefaultRootObject: index.html
-        PriceClass: PriceClass_100
-        HttpVersion: http2and3
-        Origins:
-          - Id: FrontendS3Origin
-            DomainName: !GetAtt FrontendBucket.RegionalDomainName
-            OriginAccessControlId: !Ref FrontendOriginAccessControl
-            S3OriginConfig: { OriginAccessIdentity: '' }
-        DefaultCacheBehavior:
-          TargetOriginId: FrontendS3Origin
-          ViewerProtocolPolicy: redirect-to-https
-          AllowedMethods: [GET, HEAD, OPTIONS]
-          CachedMethods: [GET, HEAD, OPTIONS]
-          Compress: true
-          ForwardedValues:
-            QueryString: false
-            Cookies: { Forward: none }
-        CustomErrorResponses:
-          - { ErrorCode: 403, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
-          - { ErrorCode: 404, ResponseCode: 200, ResponsePagePath: /index.html, ErrorCachingMinTTL: 0 }
-
-  FrontendBucketPolicy:
-    Type: AWS::S3::BucketPolicy
-    Properties:
-      Bucket: !Ref FrontendBucket
-      PolicyDocument:
-        Version: '2012-10-17'
-        Statement:
-          - Sid: AllowCloudFrontRead
-            Effect: Allow
-            Principal: { Service: cloudfront.amazonaws.com }
-            Action: s3:GetObject
-            Resource: !Sub '${FrontendBucket.Arn}/*'
-            Condition:
-              StringEquals:
-                AWS:SourceArn: !Sub 'arn:${AWS::Partition}:cloudfront::${AWS::AccountId}:distribution/${FrontendDistribution}'
+      CodeUri: frontend/
+      Handler: handler.handler
+      Role: !Ref LabRoleArn
+      Timeout: 5
+      Events:
+        Root:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /, Method: GET }
+        Index:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /index.html, Method: GET }
+        Styles:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /styles.css, Method: GET }
+        App:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /app.js, Method: GET }
+        Config:
+          Type: HttpApi
+          Properties: { ApiId: !Ref HttpApi, Path: /config.js, Method: GET }
 
 Outputs:
   ApiUrl:
@@ -407,9 +368,5 @@ Outputs:
     Value: !Ref UploadsBucket
   StateMachineArn:
     Value: !Ref CollectiveIncidentStateMachine
-  FrontendBucketName:
-    Value: !Ref FrontendBucket
-  FrontendDistributionId:
-    Value: !Ref FrontendDistribution
   FrontendUrl:
-    Value: !Sub 'https://${FrontendDistribution.DomainName}'
+    Value: !Sub 'https://${HttpApi}.execute-api.${AWS::Region}.amazonaws.com/'
